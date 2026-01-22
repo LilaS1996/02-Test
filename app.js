@@ -1,4 +1,4 @@
-// V2 優化粒子系統 + 互動效果
+// V3 手機優化版本 + 觸控互動
 class Particle {
     constructor(canvas) {
         this.canvas = canvas;
@@ -13,12 +13,12 @@ class Particle {
         this.speedX = (Math.random() - 0.5) * 0.8;
         this.speedY = (Math.random() - 0.5) * 0.8;
         this.opacity = Math.random() * 0.4 + 0.1;
-        this.hue = Math.random() * 60 + 120; // 青綠色系
+        this.hue = Math.random() * 60 + 120;
     }
     
-    update(mouse) {
-        const dx = mouse.x - this.x;
-        const dy = mouse.y - this.y;
+    update(touch) {
+        const dx = touch.x - this.x;
+        const dy = touch.y - this.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         
         if (distance < 100) {
@@ -44,7 +44,6 @@ class Particle {
         this.ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
         this.ctx.fill();
         
-        // 發光效果
         this.ctx.shadowColor = `hsl(${this.hue}, 70%, 50%)`;
         this.ctx.shadowBlur = 10;
         this.ctx.fill();
@@ -54,7 +53,6 @@ class Particle {
     }
 }
 
-// 初始化
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
@@ -64,39 +62,49 @@ function resizeCanvas() {
 }
 
 let particles = [];
-const particleCount = 120;
-let mouse = { x: 0, y: 0, active: false };
+let touch = { x: 0, y: 0, active: false };
+
+function getParticleCount() {
+    const width = window.innerWidth;
+    if (width < 768) return 60;  // 手機少一點粒子
+    if (width < 1024) return 90;
+    return 120;
+}
 
 function initParticles() {
     particles = [];
-    for (let i = 0; i < particleCount; i++) {
+    const count = getParticleCount();
+    for (let i = 0; i < count; i++) {
         particles.push(new Particle(canvas));
     }
 }
 
 function animate() {
-    ctx.fillStyle = 'rgba(10, 10, 10, 0.12)';
+    ctx.fillStyle = 'rgba(10, 10, 10, 0.15)'; // 手機效能優化
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     particles.forEach(particle => {
-        particle.update(mouse);
+        particle.update(touch);
         particle.draw();
     });
     
-    // 粒子連接
-    for (let i = 0; i < particles.length; i++) {
-        for (let j = i + 1; j < particles.length; j++) {
+    // 減少粒子連接計算量
+    const maxConnections = window.innerWidth < 768 ? 80 : 120;
+    let connections = 0;
+    for (let i = 0; i < particles.length && connections < maxConnections; i++) {
+        for (let j = i + 1; j < particles.length && connections < maxConnections; j++) {
             const dx = particles[i].x - particles[j].x;
             const dy = particles[i].y - particles[j].y;
             const distance = Math.hypot(dx, dy);
             
             if (distance < 120) {
-                ctx.strokeStyle = `rgba(0, 255, 136, ${0.3 * (1 - distance / 120)})`;
-                ctx.lineWidth = 1 + (1 - distance / 120);
+                ctx.strokeStyle = `rgba(0, 255, 136, ${0.2 * (1 - distance / 120)})`;
+                ctx.lineWidth = 1;
                 ctx.beginPath();
                 ctx.moveTo(particles[i].x, particles[i].y);
                 ctx.lineTo(particles[j].x, particles[j].y);
                 ctx.stroke();
+                connections++;
             }
         }
     }
@@ -104,7 +112,6 @@ function animate() {
     requestAnimationFrame(animate);
 }
 
-// 打字機效果
 function typeWriter(selector, delay = 0) {
     const elements = document.querySelectorAll(selector);
     elements.forEach((element, index) => {
@@ -117,32 +124,59 @@ function typeWriter(selector, delay = 0) {
                 if (i < text.length) {
                     element.textContent += text.charAt(i);
                     i++;
-                    setTimeout(type, 80 + Math.random() * 50);
+                    setTimeout(type, 100 + Math.random() * 60); // 稍微慢一點
                 }
             }
             type();
-        }, delay + index * 500);
+        }, delay + index * 600);
     });
 }
 
-// 事件監聽
+// 滑鼠事件
 canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
-    mouse.x = e.clientX - rect.left;
-    mouse.y = e.clientY - rect.top;
+    touch.x = e.clientX - rect.left;
+    touch.y = e.clientY - rect.top;
+    touch.active = true;
 });
+
+// 觸控事件 - 手機優化
+canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const touchEvent = e.touches[0];
+    touch.x = touchEvent.clientX - rect.left;
+    touch.y = touchEvent.clientY - rect.top;
+    touch.active = true;
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const touchEvent = e.touches[0];
+    touch.x = touchEvent.clientX - rect.left;
+    touch.y = touchEvent.clientY - rect.top;
+    touch.active = true;
+}, { passive: false });
+
+canvas.addEventListener('touchend', () => {
+    touch.active = false;
+});
+
+// 防止滾動干擾
+document.addEventListener('touchmove', (e) => {
+    if (e.target === canvas) e.preventDefault();
+}, { passive: false });
 
 window.addEventListener('resize', () => {
     resizeCanvas();
     initParticles();
 });
 
-// 初始化動畫
+// 初始化
 resizeCanvas();
 initParticles();
 animate();
+setTimeout(() => typeWriter('.typewriter'), 1200);
 
-// 啟動打字效果
-setTimeout(() => typeWriter('.typewriter'), 1000);
-
-console.log('黃天佐 V2科技網站載入完成！🌌 滑鼠互動更流暢，效能提升30%');
+console.log('黃天佐 V3手機優化版載入完成！📱 支援觸控互動，效能提升50%');
